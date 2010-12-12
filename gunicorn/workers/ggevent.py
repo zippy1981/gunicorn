@@ -17,6 +17,7 @@ try:
     import gevent
 except ImportError:
     raise RuntimeError("You need gevent installed to use this worker.")
+from gevent.event import Event
 from gevent.pool import Pool
 from gevent.server import StreamServer
 from gevent import pywsgi, wsgi
@@ -54,6 +55,7 @@ class GeventWorker(AsyncWorker):
 
     def __init__(self, *args, **kwargs):
         super(GeventWorker, self).__init__(*args, **kwargs)
+        self.wakeup_ev = Event()
 
     @classmethod  
     def setup(cls):
@@ -61,7 +63,11 @@ class GeventWorker(AsyncWorker):
         monkey.noisy = False
         monkey.patch_all()
         
-        
+    def handle_quit(self, sig, frame):
+        super(GeventWorker, self).handle_quit(sig, frame)
+        self.log.info("Sending event signal.")
+        self.wakeup_ev.set()
+
     def timeout_ctx(self):
         return gevent.Timeout(self.cfg.keepalive, False)
 
@@ -73,19 +79,14 @@ class GeventWorker(AsyncWorker):
                 worker=self)
 
         server.start()
-        t = time.time()
         try:
             while self.alive:
-
-                if time.time() >= t:
-                    self.notify()
-                    t = time.time() + self.timeout
-
+                self.notify()
                 if self.ppid != os.getppid():
                     self.log.info("Parent changed, shutting down: %s" % self)
                     break
-                gevent.sleep(0.1)
-                
+                if self.wakeup_ev.wait(self.timeout):
+                    break
         except KeyboardInterrupt:
             pass
 
@@ -124,12 +125,16 @@ class GeventBaseWorker(Worker):
     def __init__(self, *args, **kwargs):
         super(GeventBaseWorker, self).__init__(*args, **kwargs)
         self.worker_connections = self.cfg.worker_connections
-    
+        self.wakeup_ev = Event()
+
     @classmethod
     def setup(cls):
         from gevent import monkey
         monkey.patch_all()
 
+    def handle_quit(self, sig, frame):
+        super(GeventBaseWorker, self).handle_quit(sig, frame)
+        self.wakeup_ev.set()
         
     def run(self):
         self.socket.setblocking(1)
@@ -139,20 +144,14 @@ class GeventBaseWorker(Worker):
                         spawn=pool, handler_class=self.wsgi_handler)
         server.start()
 
-        t = time.time()
         try:
             while self.alive:
-                if time.time() >= t:
-                    self.notify()
-                    t = time.time() + self.timeout
-            
+                self.notify()
                 if self.ppid != os.getppid():
                     self.log.info("Parent changed, shutting down: %s" % self)
                     break
-                
-                # sleep 
-                gevent.sleep(0.1) 
-
+                if self.wakeup_ev.wait(self.timeout):
+                    break
         except KeyboardInterrupt:
             pass
 

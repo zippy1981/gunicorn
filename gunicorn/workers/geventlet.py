@@ -13,12 +13,17 @@ try:
     import eventlet
 except ImportError:
     raise RuntimeError("You need eventlet installed to use this worker.")
+from eventlet.event import Event
 from eventlet import hubs
 from eventlet.greenio import GreenSocket
 
 from gunicorn.workers.async import AsyncWorker
 
 class EventletWorker(AsyncWorker):
+
+    def __init__(self, *args, **kwargs):
+        super(EventletWorker, self).__init__(*args, **kwargs)
+        self.wakeup_ev = Event()
 
     @classmethod
     def setup(cls):
@@ -30,7 +35,11 @@ class EventletWorker(AsyncWorker):
     def init_process(self):
         hubs.use_hub()
         super(EventletWorker, self).init_process()
-        
+
+    def handle_quit(self, sig, frame):
+        super(EventletWorker, self).handle_quit(sig, frame)
+        self.wakeup_ev.send()
+
     def timeout_ctx(self):
         return eventlet.Timeout(self.cfg.keepalive, False) 
 
@@ -40,17 +49,13 @@ class EventletWorker(AsyncWorker):
         self.acceptor = eventlet.spawn(eventlet.serve, self.socket,
                 self.handle, self.worker_connections)
 
-        t = time.time()
         while self.alive:
-            if time.time() >= t:
-                self.notify()
-                t = time.time() + self.timeout
-            
+            self.notify()
             if self.ppid != os.getppid():
                 self.log.info("Parent changed, shutting down: %s" % self)
                 break
-
-            eventlet.sleep(0.1)
+            with eventlet.Timeout(self.timeout, False):
+                self.wakeup_ev.wait()
 
         self.notify()
         with eventlet.Timeout(self.timeout, False):
