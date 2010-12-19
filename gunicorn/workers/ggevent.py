@@ -37,7 +37,6 @@ BASE_WSGI_ENV = {
     'wsgi.run_once': False
 }
 
-
 class GGeventServer(StreamServer):
     def __init__(self, listener, handle, spawn='default', worker=None):
         StreamServer.__init__(self, listener, spawn=spawn)
@@ -52,20 +51,16 @@ class GGeventServer(StreamServer):
 
 class GeventWorker(AsyncWorker):
 
-    def __init__(self, *args, **kwargs):
-        super(GeventWorker, self).__init__(*args, **kwargs)
-
     @classmethod  
     def setup(cls):
         from gevent import monkey
         monkey.noisy = False
         monkey.patch_all()
         
-        
     def timeout_ctx(self):
         return gevent.Timeout(self.cfg.keepalive, False)
 
-    def run(self):
+    def start_accepting(self):
         self.socket.setblocking(1)
 
         pool = Pool(self.worker_connections)
@@ -73,25 +68,10 @@ class GeventWorker(AsyncWorker):
                 worker=self)
 
         server.start()
-        t = time.time()
-        try:
-            while self.alive:
-
-                if time.time() >= t:
-                    self.notify()
-                    t = time.time() + self.timeout
-
-                if self.ppid != os.getppid():
-                    self.log.info("Parent changed, shutting down: %s" % self)
-                    break
-                gevent.sleep(0.1)
-                
-        except KeyboardInterrupt:
-            pass
-
+    
+    def stop_accepting(self):
         try:
             # Try to stop connections until timeout
-            self.notify()
             server.stop(timeout=self.timeout)
         except:
             pass
@@ -130,8 +110,7 @@ class GeventBaseWorker(Worker):
         from gevent import monkey
         monkey.patch_all()
 
-        
-    def run(self):
+    def start_accepting(self):
         self.socket.setblocking(1)
         pool = Pool(self.worker_connections)        
         self.server_class.base_env['wsgi.multiprocess'] = (self.cfg.workers > 1)
@@ -139,23 +118,7 @@ class GeventBaseWorker(Worker):
                         spawn=pool, handler_class=self.wsgi_handler)
         server.start()
 
-        t = time.time()
-        try:
-            while self.alive:
-                if time.time() >= t:
-                    self.notify()
-                    t = time.time() + self.timeout
-            
-                if self.ppid != os.getppid():
-                    self.log.info("Parent changed, shutting down: %s" % self)
-                    break
-                
-                # sleep 
-                gevent.sleep(0.1) 
-
-        except KeyboardInterrupt:
-            pass
-
+    def stop_accepting(self):
         # try to stop the connections
         try:
             self.notify()
