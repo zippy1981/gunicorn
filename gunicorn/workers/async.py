@@ -35,7 +35,7 @@ class AsyncWorker(base.Worker):
 
     def wakeup(self):
         """\
-        Wake up the arbiter by writing to the PIPE
+        Wake up the worker by writing to the PIPE
         """
         try:
             os.write(self.PIPE[1], '.')
