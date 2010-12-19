@@ -62,7 +62,8 @@ class AsyncWorker(base.Worker):
                     break
                 
                 try:
-                    ret = select.select([self.PIPE[0]], [], [], 1.0)
+                    ret = select.select([self.PIPE[0]], [], [],
+                            self.timeout)
                     if ret[0]:
                         break
                 except select.error, e:

@@ -64,15 +64,15 @@ class GeventWorker(AsyncWorker):
         self.socket.setblocking(1)
 
         pool = Pool(self.worker_connections)
-        server = GGeventServer(self.socket, self.handle, spawn=pool,
+        self.server = GGeventServer(self.socket, self.handle, spawn=pool,
                 worker=self)
 
-        server.start()
+        self.server.start()
     
     def stop_accepting(self):
         try:
             # Try to stop connections until timeout
-            server.stop(timeout=self.timeout)
+            self.server.stop(timeout=self.timeout)
         except:
             pass
 
