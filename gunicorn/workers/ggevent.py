@@ -20,6 +20,7 @@ except ImportError:
 from gevent.event import Event
 from gevent.pool import Pool
 from gevent.server import StreamServer
+from gevent import socket
 from gevent import pywsgi, wsgi
 
 import gunicorn
@@ -37,8 +38,6 @@ BASE_WSGI_ENV = {
     'wsgi.multiprocess': False,
     'wsgi.run_once': False
 }
-
-
 
 class GGeventServer(StreamServer):
     def __init__(self, listener, handle, spawn='default', worker=None):
@@ -87,17 +86,14 @@ class GeventWorker(AsyncWorker):
         except:
             pass
 
-    """def register_signal(self, signum, handler):
+    def register_signal(self, signum, handler):
         def _wrap_handler(*args, **kwargs):
-            return handler()
+            handler() 
 
+        signal.signal(signum, _wrap_handler)
         if callable(handler):
-            gevent.signal(signum, handler)
-            self.monitored[handler] = signal
-        else:
-            signal.signal(signum, handler)"""
-
-
+            gevent.signal(signum, _wrap_handler)
+        
     def handle_request(self, *args):
         try:
             super(GeventWorker, self).handle_request(*args)
@@ -139,6 +135,14 @@ class GeventBaseWorker(Worker):
 
     def wait(self):
         return self.wakeup_ev.wait(self.timeout)
+
+    def register_signal(self, signum, handler):
+        def _wrap_handler(*args, **kwargs):
+            handler() 
+
+        signal.signal(signum, _wrap_handler)
+        if callable(handler):
+            gevent.signal(signum, _wrap_handler)
 
     def run(self):
         self.socket.setblocking(1)

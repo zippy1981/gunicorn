@@ -106,7 +106,7 @@ class Worker(object):
         signal.signal(signum, handler)
 
     def init_signals(self):
-        map(lambda s: self.register_signal(s, signal.SIG_DFL), self.SIGNALS)
+        map(lambda s: self.register_signal(s, signal.SIG_IGN), self.SIGNALS)
         self.register_signal(signal.SIGQUIT, self.handle_quit)
         self.register_signal(signal.SIGTERM, self.handle_exit)
         self.register_signal(signal.SIGINT, self.handle_exit)
@@ -122,7 +122,6 @@ class Worker(object):
     def handle_error(self, client, exc):
         if isinstance(exc, (InvalidRequestLine, InvalidRequestMethod,
             InvalidHTTPVersion, InvalidHeader, InvalidHeaderName,)):
-            
             if isinstance(exc, InvalidRequestLine):
                 mesg = "<p>Invalid Request Line '%s'</p>" % str(exc)
             elif isinstance(exc, InvalidRequestMethod):

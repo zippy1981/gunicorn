@@ -54,12 +54,12 @@ class AsyncWorker(base.Worker):
         self.stop_accepting()
 
     def handle_quit(self, *args):
-        self.wakeup()
         super(AsyncWorker, self).handle_quit(*args)
+        self.wakeup()
 
     def handle_exit(self, *args):
-        self.wakeup()
         super(AsyncWorker, self).handle_exit(*args)
+        self.wakeup()
 
     def handle(self, client, addr):
         try:

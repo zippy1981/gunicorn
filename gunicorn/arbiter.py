@@ -418,6 +418,7 @@ class Arbiter(object):
         """
         if len(self.WORKERS.keys()) < self.num_workers:
                 self.spawn_workers()
+       
         
         num_to_kill = len(self.WORKERS) - self.num_workers
         for i in range(num_to_kill, 0, -1):
@@ -425,6 +426,7 @@ class Arbiter(object):
             for (wpid, worker) in self.WORKERS.items():
                 if worker.age < age:
                     pid, age = wpid, worker.age
+
             self.kill_worker(pid, signal.SIGQUIT)
             
     def spawn_worker(self):
@@ -454,7 +456,7 @@ class Arbiter(object):
             sys.exit(-1)
         finally:
             self.log.info("Worker exiting (pid: %s)" % worker_pid)
-            try:
+            try: 
                 worker.tmp.close()
                 self.cfg.worker_exit(self, worker)
             except:
@@ -497,4 +499,4 @@ class Arbiter(object):
                     return
                 except (KeyError, OSError):
                     return
-            raise            
+            raise
