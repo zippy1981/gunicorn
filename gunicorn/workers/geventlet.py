@@ -36,27 +36,21 @@ class EventletWorker(AsyncWorker):
         hubs.use_hub()
         super(EventletWorker, self).init_process()
 
-    def handle_quit(self, sig, frame):
-        super(EventletWorker, self).handle_quit(sig, frame)
+    def wakeup(self):
         self.wakeup_ev.send()
 
+    def wait(self):
+        with eventlet.Timeout(self.timeout, False):
+            self.wakeup_ev.wait()
     def timeout_ctx(self):
         return eventlet.Timeout(self.cfg.keepalive, False) 
 
-    def run(self):
+    def start_accepting(self):
         self.socket = GreenSocket(family_or_realsock=self.socket.sock)
         self.socket.setblocking(1)
         self.acceptor = eventlet.spawn(eventlet.serve, self.socket,
                 self.handle, self.worker_connections)
 
-        while self.alive:
-            self.notify()
-            if self.ppid != os.getppid():
-                self.log.info("Parent changed, shutting down: %s" % self)
-                break
-            with eventlet.Timeout(self.timeout, False):
-                self.wakeup_ev.wait()
-
-        self.notify()
+    def stop_accepting(self):
         with eventlet.Timeout(self.timeout, False):
             eventlet.kill(self.acceptor, eventlet.StopServe)

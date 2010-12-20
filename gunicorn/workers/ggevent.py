@@ -6,8 +6,8 @@
 from __future__ import with_statement
 
 import os
+import signal
 import sys
-import time
 
 # workaround on osx, disable kqueue
 if sys.platform == "darwin":
@@ -39,6 +39,7 @@ BASE_WSGI_ENV = {
 }
 
 
+
 class GGeventServer(StreamServer):
     def __init__(self, listener, handle, spawn='default', worker=None):
         StreamServer.__init__(self, listener, spawn=spawn)
@@ -62,40 +63,40 @@ class GeventWorker(AsyncWorker):
         from gevent import monkey
         monkey.noisy = False
         monkey.patch_all()
-        
-    def handle_quit(self, sig, frame):
-        super(GeventWorker, self).handle_quit(sig, frame)
-        self.log.info("Sending event signal.")
-        self.wakeup_ev.set()
 
     def timeout_ctx(self):
         return gevent.Timeout(self.cfg.keepalive, False)
 
-    def run(self):
+    def wait(self):
+        self.wakeup_ev.clear()
+        return self.wakeup_ev.wait(self.timeout)
+
+    def wakeup(self):
+        self.wakeup_ev.set()
+
+    def start_accepting(self):
         self.socket.setblocking(1)
-
         pool = Pool(self.worker_connections)
-        server = GGeventServer(self.socket, self.handle, spawn=pool,
+        self.server = GGeventServer(self.socket, self.handle, spawn=pool,
                 worker=self)
-
-        server.start()
+        self.server.start()
+    
+    def stop_accepting(self):
         try:
-            while self.alive:
-                self.notify()
-                if self.ppid != os.getppid():
-                    self.log.info("Parent changed, shutting down: %s" % self)
-                    break
-                if self.wakeup_ev.wait(self.timeout):
-                    break
-        except KeyboardInterrupt:
-            pass
-
-        try:
-            # Try to stop connections until timeout
-            self.notify()
-            server.stop(timeout=self.timeout)
+            self.server.stop(timeout=self.timeout)
         except:
             pass
+
+    """def register_signal(self, signum, handler):
+        def _wrap_handler(*args, **kwargs):
+            return handler()
+
+        if callable(handler):
+            gevent.signal(signum, handler)
+            self.monitored[handler] = signal
+        else:
+            signal.signal(signum, handler)"""
+
 
     def handle_request(self, *args):
         try:
@@ -106,8 +107,8 @@ class GeventWorker(AsyncWorker):
     def init_process(self):
         #gevent doesn't reinitialize dns for us after forking
         #here's the workaround
-        gevent.core.dns_shutdown(fail_requests=1)
-        gevent.core.dns_init()
+        #gevent.core.dns_shutdown(fail_requests=1)
+        #gevent.core.dns_init()
         super(GeventWorker, self).init_process()
 
 class GeventBaseWorker(Worker):
@@ -130,14 +131,18 @@ class GeventBaseWorker(Worker):
     @classmethod
     def setup(cls):
         from gevent import monkey
+        monkey.noisy = False
         monkey.patch_all()
 
-    def handle_quit(self, sig, frame):
-        super(GeventBaseWorker, self).handle_quit(sig, frame)
+    def wakeup(self):
         self.wakeup_ev.set()
-        
+
+    def wait(self):
+        return self.wakeup_ev.wait(self.timeout)
+
     def run(self):
         self.socket.setblocking(1)
+
         pool = Pool(self.worker_connections)        
         self.server_class.base_env['wsgi.multiprocess'] = (self.cfg.workers > 1)
         server = self.server_class(self.socket, application=self.wsgi, 
@@ -150,10 +155,12 @@ class GeventBaseWorker(Worker):
                 if self.ppid != os.getppid():
                     self.log.info("Parent changed, shutting down: %s" % self)
                     break
-                if self.wakeup_ev.wait(self.timeout):
+                if self.wait():
                     break
         except KeyboardInterrupt:
             pass
+        
+        self.notify()
 
         # try to stop the connections
         try:
@@ -162,7 +169,6 @@ class GeventBaseWorker(Worker):
         except:
             pass
         
-
 class WSGIHandler(wsgi.WSGIHandler):
     def log_request(self, *args):
         pass
@@ -171,7 +177,6 @@ class WSGIHandler(wsgi.WSGIHandler):
         env = super(WSGIHandler, self).prepare_env()
         env['RAW_URI'] = self.request.uri
         return env
-        
         
 class WSGIServer(wsgi.WSGIServer):
     base_env = BASE_WSGI_ENV        

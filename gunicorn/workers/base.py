@@ -102,23 +102,24 @@ class Worker(object):
         self.booted = True
         self.run()
 
+    def register_signal(self, signum, handler):
+        signal.signal(signum, handler)
+
     def init_signals(self):
-        map(lambda s: signal.signal(s, signal.SIG_DFL), self.SIGNALS)
-        signal.signal(signal.SIGQUIT, self.handle_quit)
-        signal.signal(signal.SIGTERM, self.handle_exit)
-        signal.signal(signal.SIGINT, self.handle_exit)
-        signal.signal(signal.SIGWINCH, self.handle_winch)
+        map(lambda s: self.register_signal(s, signal.SIG_DFL), self.SIGNALS)
+        self.register_signal(signal.SIGQUIT, self.handle_quit)
+        self.register_signal(signal.SIGTERM, self.handle_exit)
+        self.register_signal(signal.SIGINT, self.handle_exit)
+        self.register_signal(signal.SIGWINCH, self.handle_winch)
             
-    def handle_quit(self, sig, frame):
+    def handle_quit(self, *args):
         self.alive = False
 
-    def handle_exit(self, sig, frame):
+    def handle_exit(self, *args):
         self.alive = False
         sys.exit(0)
 
-
     def handle_error(self, client, exc):
-        
         if isinstance(exc, (InvalidRequestLine, InvalidRequestMethod,
             InvalidHTTPVersion, InvalidHeader, InvalidHeaderName,)):
             
@@ -144,7 +145,10 @@ class Worker(object):
             util.write_error(client, mesg, status_int=status_int, 
                     reason=reason)
         except:
-            self.log.warning("Unexpected error" % traceback.format_exc())
+            if self.debug:
+                self.log.warning("Unexpected error %s" % traceback.format_exc())
+            else:
+                self.log.warning("Unexpected error %s" % str(exc))
             pass
         
     def handle_winch(self, sig, fname):

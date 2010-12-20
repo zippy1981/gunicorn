@@ -154,6 +154,7 @@ class Arbiter(object):
                 sig = self.SIG_QUEUE.pop(0) if len(self.SIG_QUEUE) else None
                 if sig is None:
                     self.sleep()
+                    self.murder_workers()
                     self.manage_workers()
                     continue
                 
@@ -269,7 +270,7 @@ class Arbiter(object):
                     
     def halt(self, reason=None, exit_status=0):
         """ halt arbiter """
-        self.stop()
+        self.stop(graceful=False)
         self.log.info("Shutting down: %s" % self.master_name)
         if reason is not None:
             self.log.info("Reason: %s" % reason)
@@ -315,6 +316,7 @@ class Arbiter(object):
             time.sleep(0.1)
             self.reap_workers()
         self.kill_workers(signal.SIGKILL)
+        self.reap_workers()
 
     def reexec(self):
         """\
@@ -346,6 +348,8 @@ class Arbiter(object):
             self.LISTENER = create_socket(self.cfg)
             self.log.info("Listening at: %s" % self.LISTENER)    
 
+        old_workers = self.WORKERS.copy()
+
         # spawn new workers with new app & conf
         for i in range(self.app.cfg.workers):
             self.spawn_worker()
@@ -362,9 +366,25 @@ class Arbiter(object):
         # set new proc_name
         util._setproctitle("master [%s]" % self.proc_name)
         
-        # manage workers
-        self.manage_workers()
-        
+        # exit old workers
+        for pid in old_workers.keys():
+            self.kill_worker(pid, signal.SIGQUIT)
+
+    def murder_workers(self):
+        """\
+        Kill unused/idle workers
+        """
+        for (pid, worker) in list(self.WORKERS.items()):
+            try:
+                diff = time.time() - os.fstat(worker.tmp.fileno()).st_ctime
+                if diff <= self.timeout:
+                    continue
+            except ValueError:
+                continue
+
+            self.log.critical("WORKER TIMEOUT (pid:%s)" % pid)
+            self.kill_worker(pid, signal.SIGKILL)
+
     def reap_workers(self):
         """\
         Reap workers to avoid zombie processes
@@ -396,29 +416,13 @@ class Arbiter(object):
         Maintain the number of workers by spawning or killing
         as required.
         """
-        active_workers = []
-        for (pid, worker) in list(self.WORKERS.items()):
-            try:
-                stat = os.fstat(worker.tmp.fileno())
-                diff = time.time() - stat.st_ctime
-                if diff <= self.timeout:
-                    # A fully booted worker will have called notify()
-                    if stat.st_mtime < stat.st_ctime:
-                        active_workers.append(pid)
-                    continue
-            except ValueError:
-                continue
-
-            self.log.critical("WORKER TIMEOUT (pid:%s)" % pid)
-            self.kill_worker(pid, signal.SIGKILL)
-
         if len(self.WORKERS.keys()) < self.num_workers:
-            self.spawn_workers()
-
-        num_to_kill = len(active_workers) - self.num_workers
+                self.spawn_workers()
+        
+        num_to_kill = len(self.WORKERS) - self.num_workers
         for i in range(num_to_kill, 0, -1):
             pid, age = 0, sys.maxint
-            for (wpid, worker) in self.WORKERS.iteritems():
+            for (wpid, worker) in self.WORKERS.items():
                 if worker.age < age:
                     pid, age = wpid, worker.age
             self.kill_worker(pid, signal.SIGQUIT)

@@ -6,6 +6,7 @@
 from __future__ import with_statement
 
 import errno
+import os
 import socket
 import traceback
 
@@ -24,6 +25,41 @@ class AsyncWorker(base.Worker):
     
     def timeout_ctx(self):
         raise NotImplementedError()
+
+    def wait(self):
+        raise NotImplementedError
+
+    def wakeup(self):
+        return True
+
+    def start_accepting(self):
+        raise NotImplementedError
+
+    def stop_accepting(self):
+        raise NotImplementedError
+
+    def run(self):
+        self.start_accepting()
+        try:
+            while self.alive:
+                self.notify()
+                if self.ppid != os.getppid():
+                    self.log.info("Parent changed, shutting down: %s" % self)
+                    break
+                if self.wait():
+                    break
+        except KeyboardInterrupt:
+            pass
+        self.notify()
+        self.stop_accepting()
+
+    def handle_quit(self, *args):
+        self.wakeup()
+        super(AsyncWorker, self).handle_quit(*args)
+
+    def handle_exit(self, *args):
+        self.wakeup()
+        super(AsyncWorker, self).handle_exit(*args)
 
     def handle(self, client, addr):
         try:
