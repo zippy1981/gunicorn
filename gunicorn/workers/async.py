@@ -22,6 +22,7 @@ class AsyncWorker(base.Worker):
     def __init__(self, *args, **kwargs):
         super(AsyncWorker, self).__init__(*args, **kwargs)
         self.worker_connections = self.cfg.worker_connections
+        self._exit_signal = False
     
     def timeout_ctx(self):
         raise NotImplementedError()
@@ -51,14 +52,16 @@ class AsyncWorker(base.Worker):
         except KeyboardInterrupt:
             pass
         self.notify()
-        self.stop_accepting()
+        if not self._exit_signal:
+            self.stop_accepting()
 
     def handle_quit(self, *args):
         super(AsyncWorker, self).handle_quit(*args)
         self.wakeup()
 
     def handle_exit(self, *args):
-        super(AsyncWorker, self).handle_exit(*args)
+        self.alive = False
+        self._exit_signal = True
         self.wakeup()
 
     def handle(self, client, addr):

@@ -51,7 +51,65 @@ class GGeventServer(StreamServer):
     def handle(self, sock, addr):
         self.handle_func(sock, addr)
 
-class GeventWorker(AsyncWorker):
+
+class GeventAsyncSignal(object):
+    """ common class to gevent workers. 
+        We manage signals in their own greenlet, so we never block.
+        
+        gevent.signal doesn't work here. When too much signals come to
+        the worker it fails with the error:
+
+            [err] evsignal_cb: read: Interrupted system call
+            
+        Probably related to: 
+        http://www.mail-archive.com/libevent-users@monkey.org/msg00385.html.
+    """
+
+
+    SIGNALS = map(
+        lambda x: getattr(signal, "SIG%s" % x),
+        "HUP QUIT INT TERM USR1 USR2 WINCH CHLD".split()
+    )
+
+
+    SIG_QUEUE = []
+    WORKER_SIGNALS = map(
+        lambda x: getattr(signal, "SIG%s" % x),
+        "QUIT INT TERM".split()
+    )
+    SIG_NAMES = dict(
+        (getattr(signal, name), name[3:].lower()) for name in dir(signal)
+        if name[:3] == "SIG" and name[3] != "_"
+    )
+
+    def wakeup(self):
+        self.wakeup_ev.set()
+
+    def wait(self):
+        return self.wakeup_ev.wait(self.timeout)
+
+    def handle_signals(self):
+        while self.alive: 
+            sig = self.SIG_QUEUE.pop(0) if len(self.SIG_QUEUE) else None
+            if sig is not None:
+                signame = self.SIG_NAMES.get(sig)
+                if signame in ("term", "int"):
+                    handler = self.handle_exit 
+                else:
+                    handler = getattr(self, "handle_%s" % signame, None)
+                handler()
+            gevent.sleep(1.0)
+
+    def signal(self, sig, frame):
+        if len(self.SIG_QUEUE) < 5:
+            self.SIG_QUEUE.append(sig)
+
+    def init_signals(self):
+        map(lambda s: signal.signal(s, signal.SIG_IGN), self.SIGNALS)
+        map(lambda s: signal.signal(s, self.signal), self.WORKER_SIGNALS)
+        signal.signal(signal.SIGWINCH, self.handle_winch)
+
+class GeventWorker(GeventAsyncSignal, AsyncWorker):
 
     def __init__(self, *args, **kwargs):
         super(GeventWorker, self).__init__(*args, **kwargs)
@@ -66,14 +124,8 @@ class GeventWorker(AsyncWorker):
     def timeout_ctx(self):
         return gevent.Timeout(self.cfg.keepalive, False)
 
-    def wait(self):
-        self.wakeup_ev.clear()
-        return self.wakeup_ev.wait(self.timeout)
-
-    def wakeup(self):
-        self.wakeup_ev.set()
-
     def start_accepting(self):
+        gevent.spawn(self.handle_signals)
         self.socket.setblocking(1)
         pool = Pool(self.worker_connections)
         self.server = GGeventServer(self.socket, self.handle, spawn=pool,
@@ -85,29 +137,21 @@ class GeventWorker(AsyncWorker):
             self.server.stop(timeout=self.timeout)
         except:
             pass
-
-    def register_signal(self, signum, handler):
-        def _wrap_handler(*args, **kwargs):
-            handler() 
-
-        signal.signal(signum, _wrap_handler)
-        if callable(handler):
-            gevent.signal(signum, _wrap_handler)
         
     def handle_request(self, *args):
         try:
             super(GeventWorker, self).handle_request(*args)
         except gevent.GreenletExit:
-            pass
+            pass 
 
     def init_process(self):
         #gevent doesn't reinitialize dns for us after forking
         #here's the workaround
-        #gevent.core.dns_shutdown(fail_requests=1)
-        #gevent.core.dns_init()
-        super(GeventWorker, self).init_process()
+        gevent.core.dns_shutdown(fail_requests=1)
+        gevent.core.dns_init()
+        super(GeventWorker, self).init_process() 
 
-class GeventBaseWorker(Worker):
+class GeventBaseWorker(GeventAsyncSignal, Worker):
     """\
     This base class is used for the two variants of workers that use
     Gevent's two different WSGI workers. ``gevent_wsgi`` worker uses
@@ -123,6 +167,7 @@ class GeventBaseWorker(Worker):
         super(GeventBaseWorker, self).__init__(*args, **kwargs)
         self.worker_connections = self.cfg.worker_connections
         self.wakeup_ev = Event()
+        self._exit_signal = False
 
     @classmethod
     def setup(cls):
@@ -130,21 +175,17 @@ class GeventBaseWorker(Worker):
         monkey.noisy = False
         monkey.patch_all()
 
-    def wakeup(self):
-        self.wakeup_ev.set()
+    def handle_exit(self, *args):
+        self.alive = False
+        self._exit_signal = True
+        self.wakeup()
 
-    def wait(self):
-        return self.wakeup_ev.wait(self.timeout)
-
-    def register_signal(self, signum, handler):
-        def _wrap_handler(*args, **kwargs):
-            handler() 
-
-        signal.signal(signum, _wrap_handler)
-        if callable(handler):
-            gevent.signal(signum, _wrap_handler)
-
+    def handle_quit(self, *args):
+        self.alive = False
+        self.wakeup()
+        
     def run(self):
+        gevent.spawn(self.handle_signals)
         self.socket.setblocking(1)
 
         pool = Pool(self.worker_connections)        
@@ -164,15 +205,23 @@ class GeventBaseWorker(Worker):
         except KeyboardInterrupt:
             pass
         
+        if not self._exit_signal:
+            return
+        
         self.notify()
-
         # try to stop the connections
         try:
-            self.notify()
             server.stop(timeout=self.timeout)
         except:
             pass
-        
+
+    def init_process(self):
+        #gevent doesn't reinitialize dns for us after forking
+        #here's the workaround
+        gevent.core.dns_shutdown(fail_requests=1)
+        gevent.core.dns_init()
+        super(GeventBaseWorker, self).init_process() 
+
 class WSGIHandler(wsgi.WSGIHandler):
     def log_request(self, *args):
         pass
