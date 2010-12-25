@@ -147,9 +147,7 @@ class Request(Message):
             return ""
 
         self.headers = self.parse_headers(buf.getvalue()[:idx])
-        ret = buf.getvalue()[idx+4:]
-        buf = StringIO()
-        return ret
+        return buf.getvalue()[idx+4:]
     
     def parse_request_line(self, line):
         bits = line.split(None, 2)
