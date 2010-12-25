@@ -128,10 +128,11 @@ class Request(Message):
             idx = buf.getvalue().find("\r\n")
         self.parse_request_line(buf.getvalue()[:idx])
         rest = buf.getvalue()[idx+2:] # Skip \r\n
-        buf.truncate(0)
+
+        # no need to truncate, just create a new instance.
+        buf = StringIO()
         buf.write(rest)
-       
-        
+
         # Headers
         idx = buf.getvalue().find("\r\n\r\n")
 
@@ -146,9 +147,8 @@ class Request(Message):
             return ""
 
         self.headers = self.parse_headers(buf.getvalue()[:idx])
-
         ret = buf.getvalue()[idx+4:]
-        buf.truncate(0)
+        buf = StringIO()
         return ret
     
     def parse_request_line(self, line):
