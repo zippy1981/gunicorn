@@ -20,6 +20,7 @@ class Message(object):
         self.unreader = unreader
         self.version = None
         self.headers = []
+        self.headers_dict = {}
         self.trailers = []
         self.body = None
 
@@ -57,25 +58,23 @@ class Message(object):
             value = ''.join(value).rstrip()
             
             headers.append((name, value))
+            self.headers_dict[name] = value.lower() 
         return headers
 
     def set_body_reader(self):
         chunked = False
         clength = None
-        for (name, value) in self.headers:
-            if name == "CONTENT-LENGTH":
-                try:
-                    clength = int(value)
-                except ValueError:
-                    clength = None
-            elif name == "TRANSFER-ENCODING":
-                chunked = value.lower() == "chunked"
-            elif name == "SEC-WEBSOCKET-KEY1":
-                clength = 8
 
-            if clength is not None or chunked:
-                break
-
+        if self.headers_dict.get("TRANSFER-ENCODING") == "chunked":
+            chunked = True
+        elif self.headers_dict.get("CONTENT-LENGTH") is not None: 
+            try:
+                clength = int(self.headers_dict.get("CONTENT-LENGTH"))
+            except ValueErrror:
+                clength = None
+        elif self.headers_dict.get("SEC-WEBSOCKET_KEY1"):
+            clenght = 8
+        
         if chunked:
             self.body = Body(ChunkedReader(self, self.unreader))
         elif clength is not None:
@@ -84,16 +83,13 @@ class Message(object):
             self.body = Body(EOFReader(self.unreader))
 
     def should_close(self):
-        for (h, v) in self.headers:
-            if h == "CONNECTION":
-                v = v.lower().strip()
-                if v == "close":
-                    return True
-                elif v == "keep-alive":
-                    return False
-                break
+        if "CONNECTION" in self.headers_dict:
+            v = self.headers_dict["CONNECTION"]
+            if v == "close":
+                return True
+            elif v == "keep-alive":
+                return False
         return self.version <= (1, 0)
-
 
 class Request(Message):
     def __init__(self, unreader):
