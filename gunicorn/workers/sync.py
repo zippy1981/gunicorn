@@ -65,7 +65,7 @@ class SyncWorker(base.Worker):
     
     def handle(self, client, addr):
         try:
-            parser = http.RequestParser(client)
+            parser = wsgi.WSGIRequestParser(client)
             req = parser.next()
             self.handle_request(req, client, addr)
         except StopIteration:

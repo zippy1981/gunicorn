@@ -58,8 +58,13 @@ class Message(object):
             value = ''.join(value).rstrip()
             
             headers.append((name, value))
-            self.headers_dict[name] = value 
+            self.headers_dict[name] = value
+            self.handle_header(name, value)
+            
         return headers
+
+    def handle_header(self, name, value):
+        return None
 
     def set_body_reader(self):
         chunked = False
@@ -98,7 +103,6 @@ class Request(Message):
     def __init__(self, unreader):
         self.methre = re.compile("[A-Z0-9$-_.]{3,20}")
         self.versre = re.compile("HTTP/(\d+).(\d+)")
-    
         self.method = None
         self.uri = None
         self.scheme = None
@@ -107,9 +111,7 @@ class Request(Message):
         self.path = None
         self.query = None
         self.fragment = None
-
         super(Request, self).__init__(unreader)
-
 
     def get_data(self, unreader, buf, stop=False):
         data = unreader.read()
@@ -186,5 +188,3 @@ class Request(Message):
         super(Request, self).set_body_reader()
         if isinstance(self.body.reader, EOFReader):
             self.body = Body(LengthReader(self.unreader, 0))
-
-

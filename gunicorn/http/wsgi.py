@@ -10,13 +10,61 @@ import sys
 from urllib import unquote
 
 from gunicorn import SERVER_SOFTWARE
+from gunicorn.http.parser import Parser
+from gunicorn.http.message import Request
+
+
 import gunicorn.util as util
 
 NORMALIZE_SPACE = re.compile(r'(?:\r\n)?[ \t]+')
 
 log = logging.getLogger(__name__)
 
+class WSGIRequest(Request):
+
+    def __init__(self, unreader):
+        self.server = None
+        self.expect_continue = False 
+        self.forward = None
+        self.url_scheme = "http"
+        self.script_name = os.environ.get("SCRIPT_NAME", "")
+        self.environ = {}
+        super(WSGIRequest, self).__init__(unreader)
+
+    def handle_header(self, name, value):
+        if name == "EXPECT":
+            if value.lower() == "100-continue":
+                self.expect_continue = True
+
+        elif name == "X-FORWARDED-FOR":
+            self.forward = hdr_value
+        elif name == "X-FORWARDED-PROTOCOL" and value.lower() == "ssl":
+            self.url_scheme = "https"
+        elif name == "X-FORWARDED-SSL" and value.lower() == "on":
+            self.url_scheme = "https"
+        elif name == "HOST":
+            self.server = value
+        elif name == "SCRIPT_NAME":
+            self.script_name = value
+        elif name == "CONTENT-TYPE":
+            self.environ['CONTENT_TYPE'] = value
+            return
+        elif name == "CONTENT-LENGTH":
+            self.environ['CONTENT_LENGTH'] = value
+            return
+        
+        key = 'HTTP_' + name.replace('-', '_')
+        self.environ[key] = value
+
+class WSGIRequestParser(Parser):
+    def __init__(self, *args, **kwargs):
+        super(WSGIRequestParser, self).__init__(WSGIRequest, *args, 
+                **kwargs)
+
 def create(req, sock, client, server, cfg):
+    if req.expect_continue:
+        sock.send("HTTP/1.1 100 Continue\r\n\r\n")
+
     resp = Response(req, sock)
 
     environ = {
@@ -40,38 +88,13 @@ def create(req, sock, client, server, cfg):
     # may not qualify the remote addr:
     # http://www.ietf.org/rfc/rfc3875
     client = client or "127.0.0.1"
-    forward = client
-    url_scheme = "http"
-    script_name = os.environ.get("SCRIPT_NAME", "")
+    forward = req.forward or client
 
-    for hdr_name, hdr_value in req.headers:
-        if hdr_name == "EXPECT":
-            # handle expect
-            if hdr_value.lower() == "100-continue":
-                sock.send("HTTP/1.1 100 Continue\r\n\r\n")
-        elif hdr_name == "X-FORWARDED-FOR":
-            forward = hdr_value
-        elif hdr_name == "X-FORWARDED-PROTOCOL" and hdr_value.lower() == "ssl":
-            url_scheme = "https"
-        elif hdr_name == "X-FORWARDED-SSL" and hdr_value.lower() == "on":
-            url_scheme = "https"
-        elif hdr_name == "HOST":
-            server = hdr_value
-        elif hdr_name == "SCRIPT_NAME":
-            script_name = hdr_value
-        elif hdr_name == "CONTENT-TYPE":
-            environ['CONTENT_TYPE'] = hdr_value
-            continue
-        elif hdr_name == "CONTENT-LENGTH":
-            environ['CONTENT_LENGTH'] = hdr_value
-            continue
+    server = req.server or server
+   
+    environ.update(req.environ)
+    environ['wsgi.url_scheme'] = req.url_scheme
         
-        key = 'HTTP_' + hdr_name.replace('-', '_')
-        environ[key] = hdr_value
-
-    environ['wsgi.url_scheme'] = url_scheme
-        
-
     if isinstance(forward, basestring):
         # we only took the last one
         # http://en.wikipedia.org/wiki/X-Forwarded-For
@@ -89,9 +112,9 @@ def create(req, sock, client, server, cfg):
     if isinstance(server, basestring):
         server =  server.split(":")
         if len(server) == 1:
-            if url_scheme == "http":
+            if req.url_scheme == "http":
                 server.append("80")
-            elif url_scheme == "https":
+            elif res.url_scheme == "https":
                 server.append("443")
             else:
                 server.append('')
@@ -99,10 +122,10 @@ def create(req, sock, client, server, cfg):
     environ['SERVER_PORT'] = server[1]
 
     path_info = req.path
-    if script_name:
-        path_info = path_info.split(script_name, 1)[1]
+    if req.script_name:
+        path_info = path_info.split(req.script_name, 1)[1]
     environ['PATH_INFO'] = unquote(path_info)
-    environ['SCRIPT_NAME'] = script_name
+    environ['SCRIPT_NAME'] = req.script_name
 
     return resp, environ
 
