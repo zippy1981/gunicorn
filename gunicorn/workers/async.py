@@ -26,7 +26,7 @@ class AsyncWorker(base.Worker):
 
     def handle(self, client, addr):
         try:
-            parser = http.WSGIRequestParser(client)
+            parser = wsgi.WSGIRequestParser(client)
             try:
                 while True:
                     req = None
