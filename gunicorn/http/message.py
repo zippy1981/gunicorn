@@ -58,36 +58,39 @@ class Message(object):
             value = ''.join(value).rstrip()
             
             headers.append((name, value))
-            self.headers_dict[name] = value.lower() 
+            self.headers_dict[name] = value 
         return headers
 
     def set_body_reader(self):
         chunked = False
         clength = None
 
-        if self.headers_dict.get("TRANSFER-ENCODING") == "chunked":
-            chunked = True
-        elif self.headers_dict.get("CONTENT-LENGTH") is not None: 
-            try:
-                clength = int(self.headers_dict.get("CONTENT-LENGTH"))
-            except ValueErrror:
-                clength = None
-        elif self.headers_dict.get("SEC-WEBSOCKET_KEY1"):
-            clenght = 8
-        
+        if self.headers_dict.get("TRANSFER-ENCODING"):
+            value = self.headers_dict.get("TRANSFER-ENCODING").lower()
+            chunked = value.lower() == "chunked"
+
         if chunked:
             self.body = Body(ChunkedReader(self, self.unreader))
-        elif clength is not None:
-            self.body = Body(LengthReader(self.unreader, clength))
         else:
-            self.body = Body(EOFReader(self.unreader))
+            if self.headers_dict.get("CONTENT-LENGTH") is not None: 
+                try:
+                    clength = int(self.headers_dict.get("CONTENT-LENGTH"))
+                except ValueErrror:
+                    clength = None
+            elif self.headers_dict.get("SEC-WEBSOCKET_KEY1"):
+                clenght = 8
+        
+            if clength is not None:
+                self.body = Body(LengthReader(self.unreader, clength))
+            else:
+                self.body = Body(EOFReader(self.unreader))
 
     def should_close(self):
         if "CONNECTION" in self.headers_dict:
-            v = self.headers_dict["CONNECTION"]
-            if v == "close":
+            conn = self.headers_dict["CONNECTION"].lower()
+            if conn == "close":
                 return True
-            elif v == "keep-alive":
+            elif conn == "keep-alive":
                 return False
         return self.version <= (1, 0)
 
