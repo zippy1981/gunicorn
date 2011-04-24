@@ -10,13 +10,9 @@ import sys
 from urllib import unquote
 
 from gunicorn import SERVER_SOFTWARE
+from gunicorn.http.sendfile import sendfile
 import gunicorn.util as util
 
-try:
-    # Python 3.3 has os.sendfile().
-    from os import sendfile
-except:
-    from sendfile import sendfile
 
 NORMALIZE_SPACE = re.compile(r'(?:\r\n)?[ \t]+')
 
