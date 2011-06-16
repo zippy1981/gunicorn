@@ -8,10 +8,18 @@ import os
 import sys
 import traceback
 
+from gunicorn.arbiter import Arbiter
 from gunicorn.config import Config
 from gunicorn.app.base import Application
 
 ENVIRONMENT_VARIABLE = 'DJANGO_SETTINGS_MODULE'
+
+class DjangoCommandArbiter(Arbiter):
+
+    def reload(self):
+        self.reexec()
+        self.stop()
+        raise StopIteration
 
 class DjangoApplication(Application):
     
@@ -199,6 +207,28 @@ class DjangoApplicationCommand(DjangoApplication):
                 error_text = str(e)
             sys.stderr.write(self.style.ERROR("Error: %s" % error_text) + '\n')
             sys.exit(1)
+
+    def run(self):
+        if self.cfg.spew:
+            debug.spew()
+        if self.cfg.daemon:
+            util.daemonize()
+        else:
+            try:
+                os.setpgrp()
+            except OSError, e:
+                if e[0] != errno.EPERM:
+                    raise
+                    
+        self.configure_logging()
+        try:
+            DjangoCommandArbiter(self).run()
+        except RuntimeError, e:
+            sys.stderr.write("\nError: %s\n\n" % e)
+            sys.stderr.flush()
+            sys.exit(1)
+
+        
            
 def run():
     """\
