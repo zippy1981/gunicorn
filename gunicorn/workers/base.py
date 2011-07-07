@@ -79,7 +79,6 @@ class Worker(object):
         super(MyWorkerClass, self).init_process() so that the ``run()``
         loop is initiated.
         """
-        util.set_owner_process(self.cfg.uid, self.cfg.gid)
 
         # Reseed the random number generator
         util.seed()
