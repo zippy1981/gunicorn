@@ -436,20 +436,6 @@ class PreloadApp(Setting):
         restarting workers.
         """
 
-class Daemon(Setting):
-    name = "daemon"
-    section = "Server Mechanics"
-    cli = ["-D", "--daemon"]
-    validator = validate_bool
-    action = "store_true"
-    default = False
-    desc = """\
-        Daemonize the Gunicorn process.
-        
-        Detaches the server from the controlling terminal and enters the
-        background.
-        """
-
 class Pidfile(Setting):
     name = "pidfile"
     section = "Server Mechanics"

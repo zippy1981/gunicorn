@@ -117,14 +117,12 @@ class Application(object):
     def run(self):
         if self.cfg.spew:
             debug.spew()
-        if self.cfg.daemon:
-            util.daemonize()
-        else:
-            try:
-                os.setpgrp()
-            except OSError, e:
-                if e[0] != errno.EPERM:
-                    raise
+
+        try:
+            os.setpgrp()
+        except OSError, e:
+            if e[0] != errno.EPERM:
+                raise
                     
         self.configure_logging()
         try:

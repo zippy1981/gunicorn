@@ -265,33 +265,6 @@ def to_bytestring(s):
 def is_hoppish(header):
     return header.lower().strip() in hop_headers
 
-def daemonize():
-    """\
-    Standard daemonization of a process.
-    http://www.svbug.com/documentation/comp.unix.programmer-FAQ/faq_2.html#SEC16
-    """
-    if not 'GUNICORN_FD' in os.environ:
-        if os.fork():
-            os._exit(0)
-        os.setsid()
-
-        if os.fork():
-            os._exit(0)
-        
-        os.umask(0)
-        maxfd = get_maxfd()
-
-        # Iterate through and close all file descriptors.
-        for fd in range(0, maxfd):
-            try:
-                os.close(fd)
-            except OSError:	# ERROR, fd wasn't open to begin with (ignored)
-                pass
-        
-        os.open(REDIRECT_TO, os.O_RDWR)
-        os.dup2(0, 1)
-        os.dup2(0, 2)
-
 def seed():
     try:
         random.seed(os.urandom(64))
