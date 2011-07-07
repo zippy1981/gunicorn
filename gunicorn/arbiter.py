@@ -15,7 +15,6 @@ import time
 import traceback
 
 from gunicorn.errors import HaltServer
-from gunicorn.pidfile import Pidfile
 from gunicorn.sock import create_socket
 from gunicorn import util
 
@@ -58,7 +57,6 @@ class Arbiter(object):
 
         self.setup(app)
         
-        self.pidfile = None
         self.worker_age = 0
         self.reexec_pid = 0
         self.master_name = "Master"
@@ -107,7 +105,7 @@ class Arbiter(object):
 
     def start(self):
         """\
-        Initialize the arbiter. Start listening and set pidfile if needed.
+        Initialize the arbiter. Start listening.
         """
         self.cfg.on_starting(self)
         self.pid = os.getpid()
@@ -115,9 +113,6 @@ class Arbiter(object):
         if not self.LISTENER:
             self.LISTENER = create_socket(self.cfg)
         
-        if self.cfg.pidfile is not None:
-            self.pidfile = Pidfile(self.cfg.pidfile)
-            self.pidfile.create(self.pid)
         self.log.debug("Arbiter booted")
         self.log.info("Listening at: %s (%s)", self.LISTENER,
             self.pid)
@@ -186,8 +181,6 @@ class Arbiter(object):
                 self.log.info("Unhandled exception in main loop:\n%s",  
                             traceback.format_exc())
                 self.stop(False)
-                if self.pidfile is not None:
-                    self.pidfile.unlink()
                 sys.exit(-1)
 
     def handle_chld(self, sig, frame):
@@ -278,8 +271,6 @@ class Arbiter(object):
         self.log.info("Shutting down: %s", self.master_name)
         if reason is not None:
             self.log.info("Reason: %s", reason)
-        if self.pidfile is not None:
-            self.pidfile.unlink()
         sys.exit(exit_status)
         
     def sleep(self):
@@ -325,9 +316,6 @@ class Arbiter(object):
         """\
         Relaunch the master and workers.
         """
-        if self.pidfile is not None:
-            self.pidfile.rename("%s.oldbin" % self.pidfile.fname)
-        
         self.reexec_pid = os.fork()
         if self.reexec_pid != 0:
             self.master_name = "Old Master"
@@ -355,15 +343,6 @@ class Arbiter(object):
         for i in range(self.app.cfg.workers):
             self.spawn_worker()
         
-        # unlink pidfile
-        if self.pidfile is not None:
-            self.pidfile.unlink()
-
-        # create new pidfile
-        if self.cfg.pidfile is not None:
-            self.pidfile = Pidfile(self.cfg.pidfile)
-            self.pidfile.create(self.pid)
-            
         # set new proc_name
         util._setproctitle("master [%s]" % self.proc_name)
         

@@ -428,19 +428,6 @@ class PreloadApp(Setting):
         restarting workers.
         """
 
-class Pidfile(Setting):
-    name = "pidfile"
-    section = "Server Mechanics"
-    cli = ["-p", "--pid"]
-    meta = "FILE"
-    validator = validate_string
-    default = None
-    desc = """\
-        A filename to use for the PID file.
-        
-        If not set, no PID file will be written.
-        """
-
 class TmpUploadDir(Setting):
     name = "tmp_upload_dir"
     section = "Server Mechanics"
