@@ -11,7 +11,6 @@ from gunicorn import util
 class WorkerTmp(object):
 
     def __init__(self, cfg):
-        old_umask = os.umask(cfg.umask)
         fd, name = tempfile.mkstemp(prefix="wgunicorn-")
         
         # unlink the file so we don't leak tempory files
