@@ -85,7 +85,10 @@ class UnixSocket(BaseSocket):
         return "unix:%s" % self.address
         
     def bind(self, sock):
+        old_umask = os.umask(self.conf.umask)
         sock.bind(self.address)
+        util.chown(self.address, self.conf.uid, self.conf.gid)
+        os.umask(old_umask)
         
     def close(self):
         super(UnixSocket, self).close()

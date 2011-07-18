@@ -87,6 +87,14 @@ class Config(object):
         return util.parse_address(util.to_bytestring(bind))
         
     @property
+    def uid(self):
+        return self.settings['user'].get()
+      
+    @property
+    def gid(self):
+        return self.settings['group'].get()
+        
+    @property
     def proc_name(self):
         pn = self.settings['proc_name'].get()
         if pn is not None:
@@ -426,6 +434,54 @@ class PreloadApp(Setting):
         speed up server boot times. Although, if you defer application loading
         to each worker process, you can reload your application code easily by
         restarting workers.
+        """
+
+class User(Setting):
+    name = "user"
+    section = "Server Mechanics"
+    cli = ["-u", "--user"]
+    meta = "USER"
+    validator = validate_user
+    default = os.geteuid()
+    desc = """\
+        Switch worker processes to run as this user.
+        
+        A valid user id (as an integer) or the name of a user that can be
+        retrieved with a call to pwd.getpwnam(value) or None to not change
+        the worker process user.
+        """
+
+class Group(Setting):
+    name = "group"
+    section = "Server Mechanics"
+    cli = ["-g", "--group"]
+    meta = "GROUP"
+    validator = validate_group
+    default = os.getegid()
+    desc = """\
+        Switch worker process to run as this group.
+        
+        A valid group id (as an integer) or the name of a user that can be
+        retrieved with a call to pwd.getgrnam(value) or None to not change
+        the worker processes group.
+        """
+
+class Umask(Setting):
+    name = "umask"
+    section = "Server Mechanics"
+    cli = ["-m", "--umask"]
+    meta = "INT"
+    validator = validate_pos_int
+    type = "int"
+    default = 0
+    desc = """\
+        A bit mask for the file mode on files written by Gunicorn.
+        
+        Note that this affects unix socket permissions.
+        
+        A valid value for the os.umask(mode) call or a string compatible with
+        int(value, 0) (0 means Python guesses the base, so values like "0",
+        "0xFF", "0022" are valid for decimal, hex, and octal representations)
         """
 
 class TmpUploadDir(Setting):
