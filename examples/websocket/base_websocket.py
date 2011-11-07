@@ -163,7 +163,7 @@ def encode_hybi(opcode, buf):
     byte1 = 0x80 | (opcode & 0x0f) # FIN + opcode
     if blen < 126:
         header = struct.pack('!BB', byte1, blen)
-    elif blen > 125 and blen <= 65536:
+    elif blen > 125 and blen < 65536:
         header = struct.pack('!BBH', byte1, 126, blen)
     elif blen >= 65536:
         header = struct.pack('!BBQ', byte1, 127,  blen)
