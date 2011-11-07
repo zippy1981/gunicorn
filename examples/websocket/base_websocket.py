@@ -335,6 +335,7 @@ class WebSocket(object):
                 self._msgs.append(message)
 
             self._buf = self._buf[frame['frame_length']:]
+            return self._msgs.popleft()
 
     def wait(self):
         if self.protocol_version == 7:
