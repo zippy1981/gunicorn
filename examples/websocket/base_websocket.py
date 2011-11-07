@@ -5,6 +5,7 @@
 #
 # Example code from Eventlet sources
 
+import array
 import collections
 import errno
 import re
