@@ -321,9 +321,9 @@ class WebSocket(object):
                     message = message.decode('utf-8')
 
                 elif opcode == OPCODE_CLOSE:
-                    # TODO: implement send closing frame for hybi
-                    self._send_closing_frame()
+                    self.send(message, opcode)
                     self.websocket_closed = True
+                    raise StopIteration
 
                 elif opcode == OPCODE_PING:
                     #TODO PING
