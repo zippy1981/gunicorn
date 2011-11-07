@@ -205,7 +205,7 @@ def decode_hybi(buf):
         payload_length = struct.unpack_from('!xxH', buf)[0]
     frame_length = hlen + mask*4 + payload_length
 
-    if payload_length > blen:
+    if frame_length > blen:
         # incomplete frame
         return {}
 
