@@ -338,7 +338,7 @@ class WebSocket(object):
             return self._msgs.popleft()
 
     def wait(self):
-        if self.protocol_version == 7:
+        if self.version == 7:
             return self._wait_hybi()
         else:
             return self._wait_hexi()
