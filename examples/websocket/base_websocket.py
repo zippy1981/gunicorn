@@ -162,11 +162,11 @@ def encode_hybi(opcode, buf):
 
     byte1 = 0x80 | (opcode & 0x0f) # FIN + opcode
     if blen < 126:
-        header = struct.pack('>BB', byte1, blen)
+        header = struct.pack('!BB', byte1, blen)
     elif blen > 125 and blen <= 65536:
-        header = struct.pack('>BBH', byte1, 126, blen)
+        header = struct.pack('!BBH', byte1, 126, blen)
     elif blen >= 65536:
-        header = struct.pack('>BBQ', byte1, 127,  blen)
+        header = struct.pack('!BBQ', byte1, 127,  blen)
     return header + buf, len(header)
 
 def decode_hybi(buf):
@@ -177,7 +177,7 @@ def decode_hybi(buf):
         # incomplete frame
         return {}
 
-    byte1, byte2 = struct.unpack_from('>BB', buf)
+    byte1, byte2 = struct.unpack_from('!BB', buf)
 
     fin = (byte1 >> 7) & 1
     rsv1 = (byte1 >> 6) & 1
@@ -195,14 +195,14 @@ def decode_hybi(buf):
             # incomplete frame
             return {}
 
-        payload_length = struct.unpack_from('>xxQ', buf)[0]
+        payload_length = struct.unpack_from('!xxQ', buf)[0]
     elif payload_length == 126:
         hlen = 4
         if blen < hlen:
             # incomplete frame
             return {}
 
-        payload_length = struct.unpack_from('>xxH', buf)[0]
+        payload_length = struct.unpack_from('!xxH', buf)[0]
     frame_length = hlen + mask*4 + payload_length
 
     if payload_length > blen:
