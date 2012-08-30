@@ -72,27 +72,27 @@ except:
 
 class _CTypesCounter(object):
 
-        def __init__(self, initial_value=0):
-            self._mmap = mmap.mmap(-1, mmap.PAGESIZE)
-            self._count = ctypes.c_int.from_buffer(self._mmap)
+    def __init__(self, initial_value=0):
+        self._mmap = mmap.mmap(-1, mmap.PAGESIZE)
+        self._count = ctypes.c_int.from_buffer(self._mmap)
 
-            # init map
-            self._count.value = initial_value
+        # init map
+        self._count.value = initial_value
 
-        def incr(self, i=1):
-            incr(self._count, i)
+    def incr(self, i=1):
+        incr(self._count, i)
 
-        def decr(self, i=1):
-            descr(self._count, i)
+    def decr(self, i=1):
+        descr(self._count, i)
 
-        def set(self, v):
-            self._count.value = v
+    def set(self, v):
+        self._count.value = v
 
-        def get(self):
-            return self._count.value
+    def get(self):
+        return self._count.value
 
-        def close(self):
-            self._mmap.close()
+    def close(self):
+        self._mmap.close()
 
 if IS_PYPY:
     _libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
