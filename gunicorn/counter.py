@@ -14,7 +14,6 @@ import errno
 import mmap
 import struct
 
-from gunicorn.workers.workertmp import WorkerTmp
 from gunicorn.util import IS_PYPY
 
 class _CTypesCounter(object):
