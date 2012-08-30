@@ -3,7 +3,13 @@
 # This file is part of gunicorn released under the MIT license.
 # See the NOTICE for more information.
 
-import ctypes
+try:
+    import ctypes
+except MemoryError:
+    ctypes = None
+except ImportError:
+    ctypes = None
+
 import errno
 import mmap
 import struct
@@ -36,7 +42,43 @@ class _CTypesCounter(object):
         self._mmap.close()
 
 
-if IS_PYPY:
+class _SimpleCounter(object):
+
+    def __init__(self, initial_value=0):
+        self._mmap = mmap.mmap(-1, mmap.PAGESIZE)
+        self._count = 0
+
+        self._commit()
+
+    def _commit(self):
+        self._mmap.seek(0)
+        s = struct.pack('i', self._count)
+        self._mmap.write(s)
+
+
+    def incr(self, i=1):
+        self._count += i
+        self._commit()
+
+    def decr(self, i=1):
+        self._count -= i
+        self._commit()
+
+    def set(self, v):
+        self._count = v
+        self._commit()
+
+    def get(self):
+        self._mmap.seek(0)
+        i, = struct.unpack('i', self._mmap[:4])
+        return i
+
+    def close(self):
+        self._mmap.close()
+
+
+
+if IS_PYPY and ctypes:
     _libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
     _mmap = _libc.mmap
     _munmap = _libc.munmap
@@ -75,5 +117,7 @@ if IS_PYPY:
                 c = ctypes.geterrno()
                 raise OSError(e, os.strerror(e))
 
-else:
+elif ctypes:
     Counter = _CTypesCounter
+else:
+    Counter = _SimpleCounter
