@@ -4,6 +4,7 @@
 # See the NOTICE for more information.
 
 from datetime import datetime
+import mmap
 import os
 import signal
 import sys
@@ -11,6 +12,7 @@ import traceback
 
 
 from gunicorn import util
+from gunicorn.counter import Counter
 from gunicorn.workers.workertmp import WorkerTmp
 from gunicorn.http.errors import InvalidHeader, InvalidHeaderName, \
 InvalidRequestLine, InvalidRequestMethod, InvalidHTTPVersion, \
@@ -46,7 +48,8 @@ class Worker(object):
         self.log = log
         self.debug = cfg.debug
         self.address = self.socket.getsockname()
-        self.tmp = WorkerTmp(cfg)
+
+        self.counter = Counter()
 
     def __str__(self):
         return "<Worker %s>" % self.pid
@@ -55,13 +58,20 @@ class Worker(object):
     def pid(self):
         return os.getpid()
 
+    @property
+    def tick(self):
+        return self.counter.get()
+
     def notify(self):
         """\
         Your worker subclass must arrange to have this method called
         once every ``self.timeout`` seconds. If you fail in accomplishing
         this task, the master process will murder your workers.
         """
-        self.tmp.notify()
+        import time
+
+        t = time.time()
+        self.counter.set(int(t))
 
     def run(self):
         """\
@@ -90,7 +100,6 @@ class Worker(object):
 
         # Prevent fd inherientence
         util.close_on_exec(self.socket)
-        util.close_on_exec(self.tmp.fileno())
 
         self.log.close_on_exec()
 

@@ -25,6 +25,7 @@ import textwrap
 import time
 import inspect
 
+IS_PYPY = hasattr(sys, 'pypy_version_info')
 
 MAXFD = 1024
 if (hasattr(os, "devnull")):

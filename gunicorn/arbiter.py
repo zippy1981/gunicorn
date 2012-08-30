@@ -391,7 +391,7 @@ class Arbiter(object):
         """
         for (pid, worker) in self.WORKERS.items():
             try:
-                if time.time() - worker.tmp.last_update() <= self.timeout:
+                if time.time() - worker.tick <= self.timeout:
                     continue
             except ValueError:
                 continue
@@ -420,7 +420,7 @@ class Arbiter(object):
                     worker = self.WORKERS.pop(wpid, None)
                     if not worker:
                         continue
-                    worker.tmp.close()
+                    worker.counter.close()
         except OSError, e:
             if e.errno == errno.ECHILD:
                 pass
@@ -469,7 +469,7 @@ class Arbiter(object):
         finally:
             self.log.info("Worker exiting (pid: %s)", worker_pid)
             try:
-                worker.tmp.close()
+                worker.counter.close()
                 self.cfg.worker_exit(self, worker)
             except:
                 pass
@@ -506,7 +506,7 @@ class Arbiter(object):
             if e.errno == errno.ESRCH:
                 try:
                     worker = self.WORKERS.pop(pid)
-                    worker.tmp.close()
+                    worker.counter.close()
                     self.cfg.worker_exit(self, worker)
                     return
                 except (KeyError, OSError):
