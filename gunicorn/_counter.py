@@ -107,7 +107,7 @@ if IS_PYPY:
     _munmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
 
 
-    class Counter(_CTypesCounter):
+    class _Counter(_CTypesCounter):
 
         def __init__(self, initial_value=0):
             self._mmap = _mmap(None,
@@ -133,5 +133,5 @@ if IS_PYPY:
                 c = ctypes.geterrno()
                 raise OSError(e, os.strerror(e))
 else:
-    Counter = _CTypesCounter
+    _Counter = _CTypesCounter
 
