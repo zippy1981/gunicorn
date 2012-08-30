@@ -21,7 +21,7 @@ except ImportError:
     _Counter = None
 
 
-if not _Counter
+if not _Counter:
     import threading
 
     class Counter(object):
