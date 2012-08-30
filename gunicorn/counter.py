@@ -70,8 +70,10 @@ if IS_PYPY:
 
 
         def close(self):
-            _munmap(self._mmap, mmap.PAGESIZE)
-
+            res = _munmap(self._mmap, mmap.PAGESIZE)
+            if res == -1:
+                c = ctypes.geterrno()
+                raise OSError(e, os.strerror(e))
 
 else:
     Counter = _CTypesCounter
