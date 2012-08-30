@@ -5,10 +5,50 @@
 
 
 import os
-from setuptools import setup, find_packages
+from distutils.errors import DistutilsError
+import shlex
 import sys
+import subprocess
+
+from setuptools import setup, find_packages
+from setuptools.extension import Extension
+
 
 from gunicorn import __version__
+
+
+def exec_process(cmdline, silent=True, input=None, **kwargs):
+    """Execute a subprocess and returns the returncode, stdout buffer and stderr buffer.
+    Optionally prints stdout and stderr while running."""
+
+    args = shlex.split(cmdline)
+    try:
+        sub = subprocess.Popen(args=args, stdin=None,
+                stdout=None, stderr=None, **kwargs)
+        stdout, stderr = sub.communicate(input=input)
+        returncode = sub.returncode
+        if not silent:
+            sys.stdout.write(stdout)
+            sys.stderr.write(stderr)
+    except OSError as e:
+        if e.errno == 2:
+            raise DistutilsError('"%s" is not present on this system' % cmdline[0])
+        else:
+            raise
+    return returncode
+
+
+
+
+atomic_test = os.path.join(os.path.dirname(__file__), "atomic_test.c")
+exts = []
+if exec_process("gcc -o atomic_test %s" % atomic_test) == 0:
+    if exec_process("./atomic-test") == 0:
+
+        exts = [Extension('gunicorn._counter_atomic',
+            sources=['gunicorn/_counter_atomic.c'])]
+
+
 
 setup(
     name = 'gunicorn',
@@ -45,6 +85,11 @@ setup(
     zip_safe = False,
     packages = find_packages(exclude=['examples', 'tests']),
     include_package_data = True,
+
+    ext_modules = [
+        Extension('gunicorn._counter_atomic', sources=[
+            'gunicorn/_counter_atomic.c'])
+    ],
 
     entry_points="""
 

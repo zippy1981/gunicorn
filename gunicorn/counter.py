@@ -19,6 +19,7 @@ import mmap
 import struct
 
 from gunicorn.util import IS_PYPY
+from gunicorn.counter_atomic import incr, descr
 
 class _CTypesCounter(object):
 
@@ -30,10 +31,10 @@ class _CTypesCounter(object):
         self._count.value = initial_value
 
     def incr(self, i=1):
-        self._count.value += i
+        incr(self._count, i)
 
     def decr(self, i=1):
-        self._count.value -= i
+        descr(self._count, i)
 
     def set(self, v):
         self._count.value = v
