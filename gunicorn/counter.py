@@ -2,6 +2,10 @@
 #
 # This file is part of gunicorn released under the MIT license.
 # See the NOTICE for more information.
+#
+# This module handle a simple counter that could be shared between the
+# arbiter and the the worker.
+
 
 try:
     import ctypes
