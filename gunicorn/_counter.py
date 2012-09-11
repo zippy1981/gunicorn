@@ -51,10 +51,10 @@ try:
 except:
     def incr(va, vb):
         if isinstance(va, int):
-                va = ctypes.c_int(va)
+            va = ctypes.c_int(va)
 
-            if isinstance(vb, int):
-                vb = ctypes.c_ulong(vb)
+        if isinstance(vb, int):
+            vb = ctypes.c_ulong(vb)
 
         with threading.Lock():
             return va + vb
