@@ -48,7 +48,7 @@ def make_default_env(cfg):
         for path in paths:
             pythonpath = os.path.abspath(cfg.pythonpath)
             if pythonpath not in sys.path:
-                sys.path.insert(0, pythonpath)
+                sys.path.append(pythonpath)
 
     try:
         os.environ['DJANGO_SETTINGS_MODULE']
@@ -63,10 +63,10 @@ def make_default_env(cfg):
         os.environ['DJANGO_SETTINGS_MODULE'] = "%s.%s" % (project_name,
                 settings_name)
         if pythonpath not in sys.path:
-            sys.path.insert(0, pythonpath)
+            sys.path.append(pythonpath)
 
         if project_path not in sys.path:
-            sys.path.insert(0, project_path)
+            sys.path.append(project_path)
 
 
 class DjangoApplication(Application):
@@ -81,7 +81,7 @@ class DjangoApplication(Application):
                 project_path, settings_name = find_settings_module(
                         os.path.abspath(args[0]))
                 if project_path not in sys.path:
-                    sys.path.insert(0, project_path)
+                    sys.path.append(project_path)
 
                 if not project_path:
                     raise RuntimeError("django project not found")
