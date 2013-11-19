@@ -84,10 +84,14 @@ class Arbiter(object):
         self.cfg.nworkers_changed(self, value, old_value)
     num_workers = property(_get_num_workers, _set_num_workers)
 
-    def setup(self, app):
+    def setup(self, app, at_reload=False):
         self.app = app
         self.cfg = app.cfg
-        self.log = self.cfg.logger_class(app.cfg)
+
+        if not at_reload:
+            # don't recreate the class here so we don't reinitialise the
+            # log handlers.
+            self.log = self.cfg.logger_class(app.cfg)
 
         # reopen files
         if 'GUNICORN_FD' in os.environ:
@@ -381,7 +385,7 @@ class Arbiter(object):
 
         # reload conf
         self.app.reload()
-        self.setup(self.app)
+        self.setup(self.app, at_reload=True)
 
         # reopen log files
         self.log.reopen_files()
