@@ -97,8 +97,7 @@ def create(req, sock, client, server, cfg):
         elif secure_headers and (hdr_name in secure_headers and
               hdr_value == secure_headers[hdr_name]):
             url_scheme = "https"
-        elif hdr_name == "HOST":
-            server = hdr_value
+
         elif hdr_name == "SCRIPT_NAME":
             script_name = hdr_value
         elif hdr_name == "CONTENT-TYPE":
@@ -127,12 +126,9 @@ def create(req, sock, client, server, cfg):
     if isinstance(server, string_types):
         server = server.split(":")
         if len(server) == 1:
-            if url_scheme == "http":
-                server.append("80")
-            elif url_scheme == "https":
-                server.append("443")
-            else:
-                server.append('')
+            # unix socket, append an empty port
+            server.append('')
+
     environ['SERVER_NAME'] = server[0]
     environ['SERVER_PORT'] = str(server[1])
 
