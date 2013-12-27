@@ -149,9 +149,9 @@ def create(req, sock, client, server, cfg):
                     else:
                         server.append('')
             else:
-             # no host header given which means that we are not behind a
-             # proxy, so append an empty port.
-             server.append('')
+                # no host header given which means that we are not behind a
+                # proxy, so append an empty port.
+                server.append('')
     environ['SERVER_NAME'] = server[0]
     environ['SERVER_PORT'] = str(server[1])
 
